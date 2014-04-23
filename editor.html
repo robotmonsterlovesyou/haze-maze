@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="initial-scale=1">
+<title>Haze Maze - Map Editor</title>
+<link rel="stylesheet" type="text/css" href="css/styles.css">
+<style>
+
+body {
+    background-color: #fff;
+}
+
+canvas {
+    background-color: #eee;
+}
+
+.tools {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    width: 200px;
+}
+
+</style>
+</head>
+
+<body>
+
+<form class="tools">
+
+<h2>Map Editor</h2>
+
+<fieldset>
+
+<legend>Cursor</legend>
+
+<div><label><input type="radio" name="map" value="walls" checked> Wall</label></div>
+<div><label><input type="radio" name="map" value="player"> Player</label></div>
+<div><label><input type="radio" name="map" value="exit"> Exit</label></div>
+<div><label><input type="radio" name="map" value="torches"> Torch</label></div>
+
+</fieldset>
+
+</form>
+
+<script src="libs/zepto.min.js"></script>
+<script src="libs/facade.min.js"></script>
+
+<script>
+
+(function () {
+
+    'use strict';
+
+    var stage = new Facade('stage', 25 * 40, 700),
+        size = 0,
+        playerBlock = new Facade.Rect({ fillStyle: '#f0f' }),
+        mapBlock = new Facade.Rect({ fillStyle: '#0f0' }),
+        torchBlock = new Facade.Rect({ fillStyle: '#0af' }),
+        exitBlock = new Facade.Rect({ fillStyle: '#00f' }),
+        cursorBlock = new Facade.Rect({ lineWidth: 2, strokeStyle: 'red', fillStyle: '' }),
+        cursorPosition = { x: 0, y: 0 },
+        mapData = null;
+
+    $.get('maps/level1.json', function (data) {
+
+        mapData = data;
+
+        size = data.size;
+
+        [playerBlock, mapBlock, torchBlock, exitBlock, cursorBlock].forEach(function (obj) {
+
+            obj.setOptions({ width: size, height: size });
+
+        });
+
+        if (mapData.player.length) {
+
+            playerBlock.setOptions(getPositionFromCoordinate(mapData.player[0]));
+
+        }
+
+    });
+
+    function getPositionFromCoordinate (coord) {
+
+        return {
+            x: coord % (stage.width() / size) * size,
+            y: Math.floor(coord / (stage.width() / size)) * size
+        };
+
+    }
+
+    function getCoordinateFromPosition (pos) {
+
+        return pos.x / size + (pos.y / size * (stage.width() / size));
+
+    }
+
+    stage.draw(function () {
+
+        var self = this;
+
+        self.clear();
+
+        if (mapData) {
+
+            mapData.walls.map(function (num) {
+
+                self.addToStage(mapBlock, getPositionFromCoordinate(num));
+
+            });
+
+            mapData.torches.forEach(function (num) {
+
+                self.addToStage(torchBlock, getPositionFromCoordinate(num));
+
+            });
+
+            if (mapData.exit.length) {
+
+                self.addToStage(exitBlock, getPositionFromCoordinate(mapData.exit[0]));
+
+            }
+
+            self.addToStage(cursorBlock, cursorPosition);
+
+            self.addToStage(playerBlock);
+
+        }
+
+    });
+
+    // stage.canvas.style.cursor = 'none';
+
+    function addPixelToMap (e) {
+
+        var pos = { x: Math.floor(e.layerX / size) * size, y: Math.floor(e.layerY / size) * size },
+            coord = getCoordinateFromPosition(pos),
+            type = $('input[name="map"]:checked').val();
+
+        if (['player', 'exit'].indexOf(type) !== -1) {
+
+            mapData[type] = [];
+
+        }
+
+        if (mapData[type].indexOf(coord) === -1) {
+
+            if (!e.metaKey) {
+
+                mapData[type].push(coord);
+
+            }
+
+        } else if (e.metaKey) {
+
+            mapData[type].splice(mapData[type].indexOf(coord), 1);
+
+        }
+
+        if (type === 'player') {
+
+            playerBlock.setOptions(getPositionFromCoordinate(mapData.player[0]));
+
+        }
+
+        console.log(JSON.stringify(mapData));
+
+    }
+
+    stage.canvas.addEventListener('mousemove', function (e) {
+
+        cursorPosition = { x: Math.floor(e.layerX / size) * size, y: Math.floor(e.layerY / size) * size };
+
+    });
+
+    stage.canvas.addEventListener('mousedown', function (e) {
+
+        addPixelToMap(e);
+
+        stage.canvas.addEventListener('mousemove', addPixelToMap);
+
+    });
+
+    stage.canvas.addEventListener('mouseup', function (e) {
+
+        stage.canvas.removeEventListener('mousemove', addPixelToMap);
+
+    });
+
+    document.body.appendChild(stage.canvas);
+
+}());
+
+</script>
+
+</body>
+</html>
